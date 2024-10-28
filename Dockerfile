@@ -1,16 +1,16 @@
-FROM alpine:latest
+FROM golang:latest
 
-ARG PB_VERSION=0.22.21
+WORKDIR /app
 
-RUN apk add --no-cache \
-    unzip \
-    ca-certificates
+COPY go.mod go.sum ./
 
-# download and unzip PocketBase
-ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
-RUN unzip /tmp/pb.zip -d /pb/
+RUN go mod download
 
+COPY . .
+
+RUN go build -o pocketbase .
+
+ENV PORT 8080
 EXPOSE 8080
 
-# start PocketBase
-CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:8080"]
+CMD ["pocketbase", "serve", "--http=0.0.0.0:8080"]
