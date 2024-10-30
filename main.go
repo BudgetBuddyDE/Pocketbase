@@ -88,7 +88,7 @@ func bindAppHooks(app core.App) {
 
 				upcomingSubscriptions, err := app.Dao().FindRecordsByFilter(
 					subscriptionTable,
-					"owner = {:owner} && paused = false && execute_at > {:date}",
+					"owner = {:owner} && paused = false && execute_at >= {:date}",
 					"-execute_at",
 					-1,
 					0,
@@ -102,9 +102,11 @@ func bindAppHooks(app core.App) {
 
 				for _, record := range upcomingSubscriptions {
 					amount := record.GetFloat("transfer_amount")
+					amount = math.Abs(amount)
+					isExpense := amount < 0
 
-					if amount < 0 {
-						expensesUpcoming += math.Abs(amount)
+					if isExpense {
+						expensesUpcoming += amount
 					} else {
 						incomeUpcoming += amount
 					}
@@ -187,35 +189,6 @@ func bindAppHooks(app core.App) {
 						} else {
 							upcomingIncome += amount
 						}
-					}
-				}
-
-				subscriptionTable := "subscriptions"
-				if result := app.Dao().HasTable(subscriptionTable); !result {
-					return apis.NewApiError(500, fmt.Sprintf("Table '%s' doesn't exist", subscriptionTable), nil)
-				}
-
-				upcomingSubscriptions, err := app.Dao().FindRecordsByFilter(
-					subscriptionTable,
-					"owner = {:owner} && paused = false && execute_at > {:date}",
-					"-execute_at",
-					-1,
-					0,
-					dbx.Params{
-						"owner": requestUser.Id,
-						"date":  now.Day(),
-					})
-				if err != nil {
-					return apis.NewApiError(500, err.Error(), nil)
-				}
-
-				for _, record := range upcomingSubscriptions {
-					amount := record.GetFloat("transfer_amount")
-
-					if amount < 0 {
-						upcomingExpenses += math.Abs(amount)
-					} else {
-						upcomingIncome += amount
 					}
 				}
 
