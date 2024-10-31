@@ -7,11 +7,16 @@ import (
 	"net/http"
 	"time"
 
+	"budget-buddy/pocketbase/custom_models"
+
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/daos"
+	"github.com/pocketbase/pocketbase/tools/cron"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 func main() {
@@ -26,6 +31,51 @@ func main() {
 
 func bindAppHooks(app core.App) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		scheduler := cron.New()
+
+		scheduler.MustAdd("process-recurring-payments", "1 0 * * *", func() {
+			subscriptionTable := "subscriptions"
+			if result := app.Dao().HasTable(subscriptionTable); !result {
+				log.Fatalf("Table '%s' doesn't exist", subscriptionTable)
+			}
+
+			subscriptions, err := app.Dao().FindRecordsByFilter(
+				subscriptionTable,
+				"paused = false && execute_at <= {:day}",
+				"-execute_at",
+				-1,
+				0,
+				dbx.Params{
+					"day": time.Now().Day(),
+				})
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+
+			app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+				for _, record := range subscriptions {
+					transaction := &custom_models.Transaction{
+						Owner:          record.GetString("owner"),
+						Category:       record.GetString("category"),
+						PaymentMethod:  record.GetString("payment_method"),
+						ProcessedAt:    types.NowDateTime(),
+						Receiver:       record.GetString("receiver"),
+						Information:    record.GetString("information"),
+						TransferAmount: record.GetFloat("transfer_amount"),
+					}
+
+					if err := txDao.Save(transaction); err != nil {
+						log.Fatal(err.Error())
+					}
+					log.Default().Println("Transaction created")
+				}
+
+				return nil
+			})
+		})
+
+		scheduler.Start()
+
 		// /transactions/stats
 		e.Router.AddRoute(echo.Route{
 			Method: http.MethodGet,
@@ -210,7 +260,6 @@ func bindAppHooks(app core.App) {
 				}
 
 				for _, record := range upcomingSubscriptions {
-					fmt.Printf("Subscription: %v\n", record)
 					amount := record.GetFloat("transfer_amount")
 
 					if amount < 0 {

@@ -1,4 +1,4 @@
-module budget-buddy.de/pocketbase
+module budget-buddy/pocketbase
 
 go 1.23.1
 
