@@ -67,7 +67,7 @@ func bindAppHooks(app core.App) {
 					if err := txDao.Save(transaction); err != nil {
 						log.Fatal(err.Error())
 					}
-					log.Default().Println("Transaction created")
+					log.Printf("Transaction created: %s", transaction.Id)
 				}
 
 				return nil
@@ -265,7 +265,7 @@ func bindAppHooks(app core.App) {
 					if amount < 0 {
 						upcomingExpenses += math.Abs(amount)
 					} else {
-						upcomingExpenses += amount
+						upcomingIncome += amount
 					}
 				}
 
