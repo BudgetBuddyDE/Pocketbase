@@ -41,7 +41,7 @@ func bindAppHooks(app core.App) {
 
 			subscriptions, err := app.Dao().FindRecordsByFilter(
 				subscriptionTable,
-				"paused = false && execute_at <= {:day}",
+				"paused = false && execute_at = {:day}",
 				"-execute_at",
 				-1,
 				0,
